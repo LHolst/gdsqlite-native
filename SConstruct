@@ -2,34 +2,45 @@
 import os
 
 # GDNative headers path
-godot_headers = "../godot_headers"
+godot_headers_path = ARGUMENTS.get("headers", os.getenv("GODOT_HEADERS", "../godot_headers"))
+target = ARGUMENTS.get("target", "debug")
 
-env = Environment(ENV = os.environ);
 
 # Platform & bits
-platform = ARGUMENTS.get("p", "windows");
-bits = ARGUMENTS.get("bits", "64");
+platform = ARGUMENTS.get("p", ARGUMENTS.get("platform", "windows"))
+bits = ARGUMENTS.get("bits", "64")
+
+env = Environment()
+if platform == "windows":
+    env = Environment(ENV = os.environ)
 
 # Include dir
-env.Append(CPPPATH=[godot_headers, 'src']);
+env.Append(CPPPATH=[godot_headers_path, 'src'])
 
-if platform == 'linux':
-	if ARGUMENTS.get('use_llvm', 'no') == 'yes':
-		env['CXX'] = 'clang++';
-	
-	if bits == '32':
-		env.Append(CCFLAGS = [ '-m32' ]);
-		env.Append(LINKFLAGS = [ '-m32' ]);
-	
-	if bits == '64':
-		env.Append(CCFLAGS = [ '-m64' ]);
-		env.Append(LINKFLAGS = [ '-m64' ]);
+if platform == "osx":
+    env.Append(CCFLAGS = ['-g','-O3', '-arch', 'x86_64'])
+    env.Append(LINKFLAGS = ['-arch', 'x86_64'])
+
+if platform == "linux":
+    env.Append(CCFLAGS = ['-fPIC', '-g','-O3', '-std=c11'])
+
+if platform == "windows":
+    if target == "debug":
+        env.Append(CCFLAGS = ['-EHsc', '-D_DEBUG', '/MDd'])
+    else:
+        env.Append(CCFLAGS = ['-O2', '-EHsc', '-DNDEBUG', '/MD'])
+
+def add_sources(sources, dir):
+    for f in os.listdir(dir):
+        if f.endswith(".c"):
+            sources.append(dir + "/" + f)
 
 # Source lists
-sources = [
-	"src/gdsqlite.c",
-	"src/sqlite/sqlite3.c"
-];
+sources = []
 
-library = env.SharedLibrary(target=("lib/gdsqlite." + bits), source=sources);
-Install("godot_project/lib/gdsqlite", source=library);
+add_sources(sources, "src")
+add_sources(sources, "src/sqlite")
+
+
+library = env.SharedLibrary(target=("lib/gdsqlite." + bits), source=sources)
+Install("godot_project/lib/gdsqlite", source=library)
